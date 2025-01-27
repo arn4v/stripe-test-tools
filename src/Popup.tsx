@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { testCards } from "./data/test-cards";
 import { testIBANs } from "./data/test-ibans";
 import type { TestCard, CardFeature } from "./data/test-cards";
 import type { TestIBAN } from "./data/test-ibans";
-import { Copy, CreditCard, Building2, Search } from "lucide-react";
+import { Copy, CreditCard, Building2, Search, Check } from "lucide-react";
 import Fuse from "fuse.js";
 
 function Badge({ feature }: { feature: CardFeature }) {
@@ -104,16 +104,26 @@ function Badge({ feature }: { feature: CardFeature }) {
 }
 
 function CopyIcon({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1000);
+  };
+
   return (
     <button
-      onClick={(e) => {
-        e.stopPropagation();
-        navigator.clipboard.writeText(text);
-      }}
+      onClick={handleCopy}
       aria-label="Copy to clipboard"
-      className="ml-2 p-1 text-gray-400 hover:text-blue-600 rounded-full hover:bg-gray-100"
+      className={`ml-2 p-1 rounded-full transition-colors ${
+        copied
+          ? "text-green-600 hover:text-green-700 hover:bg-green-50"
+          : "text-gray-400 hover:text-blue-600 hover:bg-gray-100"
+      }`}
     >
-      <Copy className="w-4 h-4" />
+      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
     </button>
   );
 }
@@ -249,6 +259,31 @@ function IBANItem({ iban }: { iban: TestIBAN }) {
 export default function Popup() {
   const [activeTab, setActiveTab] = useState<"cards" | "iban">("cards");
   const [searchTerm, setSearchTerm] = useState("");
+  const [showLeftFade, setShowLeftFade] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const countries = [
+    "Austria",
+    "Belgium",
+    "Denmark",
+    "Estonia",
+    "Finland",
+    "France",
+    "Germany",
+    "Ireland",
+    "Italy",
+    "Lithuania",
+    "Luxembourg",
+    "Netherlands",
+    "Norway",
+    "Portugal",
+    "Spain",
+    "Sweden",
+    "Switzerland",
+    "United Kingdom",
+  ];
+
+  const [selectedCountry, setSelectedCountry] = useState(countries[0]);
 
   // Initialize Fuse instances
   const cardsFuse = useMemo(
@@ -270,6 +305,12 @@ export default function Popup() {
     []
   );
 
+  const handleScroll = useCallback(() => {
+    if (scrollContainerRef.current) {
+      setShowLeftFade(scrollContainerRef.current.scrollLeft > 0);
+    }
+  }, []);
+
   // Filter items based on search term
   const filteredCards = useMemo(() => {
     if (!searchTerm) return testCards;
@@ -277,55 +318,90 @@ export default function Popup() {
   }, [searchTerm, cardsFuse]);
 
   const filteredIBANs = useMemo(() => {
-    if (!searchTerm) return testIBANs;
-    return ibanFuse.search(searchTerm).map((result) => result.item);
-  }, [searchTerm, ibanFuse]);
+    if (!searchTerm)
+      return testIBANs.filter((iban) => iban.country === selectedCountry);
+    return ibanFuse
+      .search(searchTerm)
+      .map((result) => result.item)
+      .filter((iban) => iban.country === selectedCountry);
+  }, [searchTerm, ibanFuse, selectedCountry]);
 
   return (
-    <div className="w-96 p-4">
-      <h1 className="text-xl font-bold text-gray-900 mb-4">
-        Stripe Test Tools
-      </h1>
-
-      <div className="flex mb-4 border-b">
-        <button
-          className={`px-4 py-2 flex items-center gap-2 ${
-            activeTab === "cards"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
-          }`}
-          onClick={() => setActiveTab("cards")}
-        >
-          <CreditCard className="w-4 h-4" />
-          Cards
-        </button>
-        <button
-          className={`px-4 py-2 flex items-center gap-2 ${
-            activeTab === "iban"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
-          }`}
-          onClick={() => setActiveTab("iban")}
-        >
-          <Building2 className="w-4 h-4" />
-          SEPA IBAN
-        </button>
-      </div>
-
-      <div className="relative mb-4">
-        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-          <Search className="h-4 w-4 text-gray-400" />
+    <div className="w-96">
+      <div className="sticky top-0 bg-white z-10 p-4 pb-0">
+        <div className="flex mb-4 border-b">
+          <button
+            className={`px-4 py-2 flex items-center gap-2 ${
+              activeTab === "cards"
+                ? "border-b-2 border-blue-500 text-blue-600"
+                : "text-gray-500"
+            }`}
+            onClick={() => setActiveTab("cards")}
+          >
+            <CreditCard className="w-4 h-4" />
+            Cards
+          </button>
+          <button
+            className={`px-4 py-2 flex items-center gap-2 ${
+              activeTab === "iban"
+                ? "border-b-2 border-blue-500 text-blue-600"
+                : "text-gray-500"
+            }`}
+            onClick={() => setActiveTab("iban")}
+          >
+            <Building2 className="w-4 h-4" />
+            SEPA IBAN
+          </button>
         </div>
-        <input
-          type="text"
-          placeholder={`Search ${activeTab === "cards" ? "cards" : "IBANs"}...`}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 p-2 border rounded-lg"
-        />
+
+        <div className="relative mb-4">
+          <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder={`Search ${
+              activeTab === "cards" ? "cards" : "IBANs"
+            }...`}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 p-2 border rounded-lg"
+          />
+        </div>
+
+        {activeTab === "iban" && (
+          <div className="relative mb-4">
+            <div
+              ref={scrollContainerRef}
+              onScroll={handleScroll}
+              className="overflow-x-auto flex border-b no-scrollbar"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            >
+              <div className="flex min-w-max px-1">
+                {countries.map((country) => (
+                  <button
+                    key={country}
+                    className={`px-4 py-2 whitespace-nowrap ${
+                      selectedCountry === country
+                        ? "border-b-2 border-blue-500 text-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                    onClick={() => setSelectedCountry(country)}
+                  >
+                    {country}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {showLeftFade && (
+              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none" />
+            )}
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none" />
+          </div>
+        )}
       </div>
 
-      <div className="space-y-2">
+      <div className="p-4 pt-0 space-y-2">
         {activeTab === "cards"
           ? filteredCards.map((card, index) => (
               <CardItem key={index} card={card} />
