@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Stripe Test Tools",
+  "version": "0.0.1",
+  "description": "Quick access to Stripe test cards and payment methods",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "permissions": ["activeTab", "scripting", "tabs"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["./content-script.ts"]
+    }
+  ]
+}
